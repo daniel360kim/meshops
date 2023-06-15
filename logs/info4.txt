@@ -1,0 +1,14 @@
+Log File: logs/log4.csv
+Gif File: images/2d/2D1.gif
+Directory: logs/
+..............................Length: 100
+Width: 100
+Iterations: 100
+FPS: 2
+..............................
+Date: 2023-06-15 13:17:51.552055
+GPU: False
+CPU: True
+GPU Name: 
+Device Name: LAPTOP-VE772HQM
+GPU Memory: 0
