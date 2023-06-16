@@ -1,17 +1,11 @@
 import torch
-import stringcolor
-from time import sleep
-import colorsys
-import math
-from log import Log
-from log import IterativeFile
-from GIFmake import draw_gif
-from timing import Timer
-import uuid
 import numpy as np
 from PIL import Image
-from debug_progress_bar import _get_progress_string
-import matplotlib.colors as colors
+
+from log import Log
+from log import IterativeFile
+from timing import Timer
+from errors import UnsupportedDimensionError
 
 if torch.cuda.is_available():
     print("CUDA is available, using GPU")
@@ -19,6 +13,30 @@ if torch.cuda.is_available():
 else:
     print("CUDA is not available, using CPU")
     device = torch.device("cpu")
+    
+def _index_out_of_bounds(arr, row: int, col: int) -> bool:
+    """
+    Checks if a row and column are out of bounds of a 2D array.
+    """
+    return row < 0 or col < 0 or row >= len(arr) or col >= len(arr[row])
+
+def get_numbers_around_location(arr, row: int, col: int, radius: int = 1) -> list:
+    """
+    Gets all numbers around a specified location in a 2D array as a list.
+    If on edge, the list will contain less numbers.
+    """
+    nums = []
+    
+    for mov_row in range(-radius, radius + 1):
+        for mov_col in range(-radius, radius + 1):
+            if mov_row == 0 and mov_col == 0:
+                continue
+            
+            if _index_out_of_bounds(arr, row + mov_row, col + mov_col):
+                continue
+            
+            nums.append(arr[max(0,row + mov_row)][max(0,col + mov_col)])
+    return nums
 
 class ConductiveBar:
     def __init__(self, length: int = 50):
@@ -69,13 +87,35 @@ class ConductiveSurface:
 
 # 3d framework
 class NDSquareMesh:
-    def __init__(self, dimensions: tuple, default_temp: float = 0):
-        self.mesh = torch.Tensor(dimensions).fill_(default_temp).to(device)
-        self.dimensions = dimensions
-        self.num_dimensions = len(dimensions)
-        self.history = []
+    def __init__(self, *args):
+        """
+        # NDSquareMesh
         
-        self._pad_dims = lambda mask_radius: tuple([mask_radius] * 2 * self.num_dimensions)
+        Represents an n-dimensional square mesh, tensor, or array.
+        
+        ## Overloads
+        `NDSquareMesh(pytorch_tensor: torch.Tensor)`
+        `NDSquareMesh(shape: tuple[int], default_temp: int)`
+        """
+        
+        if len(args) == 1 and type(args[0]) == torch.Tensor:
+            self.mesh = args[0]
+        
+        elif len(args) == 2 and type(args[0] == tuple) and type(args[1] == int):
+            # shape, default_temp
+            shape, default_temp = args
+            print(shape, default_temp)
+            self.mesh = torch.full(shape, default_temp)
+            print(self.mesh.shape)
+            
+        else:
+            raise(TypeError("NDSquareMesh constructor accepts either `(tensor to convert): torch.Tensor` or `(shape): tuple[int], (default temp): int`"))
+            
+        self.shape = self.mesh.shape
+        self.dimensions = len(self.shape)
+        self.history = []
+            
+        self._pad_dims = lambda mask_radius: tuple([mask_radius] * 2 * self.dimensions)
     
     def heat_region(self, center: tuple, radius: int = 2, temperature: float = 0.5) -> None:
         """
@@ -87,27 +127,29 @@ class NDSquareMesh:
         # change the square region around loc to temperature
         _nd_slice_obj = []
         
-        for i in range(self.num_dimensions):
-            _nd_slice_obj.append(slice(center[i] - radius, center[i] + radius + 1))
+        for i in range(self.dimensions):
+            _nd_slice_obj.append(slice(center[0] - radius, center[1] + radius + 1))
 
         self.mesh[*_nd_slice_obj] = temperature        
          
         # unpad
-        _center_slice = [slice(radius,-radius)]*self.num_dimensions
-        self.mesh = self.mesh[*_center_slice]
+        #print(f"before unpad: {self.mesh.shape}")
+        #_center_slice = [slice(radius,-radius)]*self.dimensions
+        #self.mesh = self.mesh[*_center_slice]
+        #print(f"not sliced slice dims: {self.mesh.shape}")
             
     def get_iterable(self) -> torch.Tensor:
         return self.mesh
 
     def run_timestep(self, conductivity_factor: float = 1) -> None:
         # save current state before moving on
-        self.history.append(self.mesh.clone())
+        #self.history.append(self.mesh.clone())
         
         # Move tensors to GPU
         
         # Create tensors for averaging with shifted versions of the heatmap tensor
         shifts = []
-        for i in range(self.num_dimensions):
+        for i in range(self.dimensions):
             shifts.append(torch.roll(self.mesh, shifts=1, dims=i))
             shifts.append(torch.roll(self.mesh, shifts=-1, dims=i))
         
@@ -122,26 +164,26 @@ class NDSquareMesh:
         # Apply padding for the edge cases
         # TODO - context-aware padding
         padded_shifts = []
-        _pad_dims = self._pad_dims(self.num_dimensions)
+        _pad_dims = self._pad_dims(self.dimensions)
         padded_mesh = torch.nn.functional.pad(self.mesh, _pad_dims, mode='constant', value=0)
         
         for tens in shifts:
             # probably have a custom pad function that handles edges better, or just handle the edges in the averaging function
-            padded_shifts.append(torch.nn.functional.pad(tens, _pad_dims, mode='constant', value=0))
+            padded_shifts.append(torch.nn.functional.pad(tens, _pad_dims, mode='constant', value=1))
 
         # Calculate the average using tensors and avoid iteration
         # Average the 3x3 square around each element
         # TODO - add support for weighted averages
-        avg = (sum(padded_shifts)+padded_mesh) / (2 * self.num_dimensions + 1)
+        avg = (sum(padded_shifts)+padded_mesh) / (2 * self.dimensions + 1)
         
         # Remove padding
-        _remove_pad_slices = [slice(1,-1)]*self.num_dimensions
+        _remove_pad_slices = [slice(1,-1)]*self.dimensions
         avg = avg[*_remove_pad_slices]
         
         # Move the result back to CPU if needed
         avg = avg.cpu()
         
-        return avg
+        self.mesh = avg
     
     def _get_mask(conductivity_factor: float = 1):
         """
@@ -156,13 +198,19 @@ class NDSquareMesh:
         ).to(device)
         
     def _import_from_image(self, image_path: str) -> None:
+        
+        if self.dimensions != 2:
+            raise UnsupportedDimensionError("Importing from an image is only supported for 2D meshes.")
+        
         """
-        Imports a 2D image from `image_path` and sets the mesh to the grayscale values of the image.
+        Imports a 2D image from `image_path` and sets the mesh to the grayscale values (0-1) of the image.
         """
         img = Image.open(image_path)
+
         img = img.resize((self.mesh.shape[0], self.mesh.shape[1]))
         
         #convert all to grayscale
         arr = np.mean(np.array(img), axis=2) / 255
+        
         
         self.mesh = torch.Tensor(arr)

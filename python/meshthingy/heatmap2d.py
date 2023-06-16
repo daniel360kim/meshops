@@ -1,18 +1,15 @@
 import torch
-import stringcolor
-from time import sleep
-import colorsys
-import math
-from media import ConductiveSurface
+from media import ConductiveSurface, NDSquareMesh
 from log import Log
 from log import IterativeFile
 from GIFmake import draw_gif
 from timing import Timer
-import uuid
 import numpy as np
 from PIL import Image
 from debug_progress_bar import _get_progress_string
 import matplotlib.colors as colors
+
+torch.set_num_threads(6)
 
 if torch.cuda.is_available():
     print("CUDA is available, using GPU")
@@ -40,13 +37,6 @@ PERF_average_calc_timer = Timer()
 PERF_color_calc_timer = Timer()
 
 # convert to 1d tensor
-heatmap_random = ConductiveSurface(LENGTH, WIDTH, 0)
-#heatmap_random.heat_square((50, 50), RADIUS, 1)
-#heatmap_random.heat_square((20, 50), RADIUS, 0.2)
-#heatmap_random.heat_square((30, 80), RADIUS, 1)
-#heatmap_random.heat_square((90, 90), RADIUS, 0.5)
-heatmap_random._import_from_image("python/meshthingy/testdraw.png")
-heatmap_random = heatmap_random.get_iterable()
 
 def runtimestep(heatmap: torch.Tensor, time_counter):
     # Move tensors to GPU
@@ -96,19 +86,28 @@ def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
 
 time_counter = 0
 
+new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
+new_heatmap.heat_region((50, 50), RADIUS+30, 1)
+
 frames = []
-frames.append(Image.fromarray(get_rgb_ndarr(heatmap_random), 'RGB'))
+frames.append(Image.fromarray(get_rgb_ndarr(new_heatmap.get_iterable()), 'RGB'))
 
 for i in range(NUM_ITERATIONS):
+    
+    # constant heat source... add heat to the center of the mesh each iter
+    #new_heatmap.heat_region((50, 50), RADIUS, 1)
     time_counter += 1
+    
+    #new_heatmap.heat_region((50, 50), RADIUS, 0.4)
 
     PERF_average_calc_timer.begin() # begin timer for average calculation
-    heatmap_random = runtimestep(heatmap_random, time_counter)
+    new_heatmap.run_timestep()
     PERF_average_calc_timer.end() # end timer for average calculation
     
     #print(heatmap_random)
     PERF_color_calc_timer.begin() #begin timer for color calculation
-    frames.append(Image.fromarray(get_rgb_ndarr(heatmap_random).astype('uint8'), 'RGB').resize((500, 500), Image.NEAREST))
+    #print(f"shape before trying to get ndarr: {new_heatmap.get_iterable().shape}")
+    frames.append(Image.fromarray(get_rgb_ndarr(new_heatmap.get_iterable()), 'RGB'))
     PERF_color_calc_timer.end() #end timer for color calculation
 
     logger.log(PERF_average_calc_timer, PERF_color_calc_timer, time_counter) # log the timings
