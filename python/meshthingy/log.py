@@ -35,6 +35,10 @@ class Log:
         self.m_logFile_Name.write(self.LOG_FILE_HEADER)
 
         info_fs = IterativeFile(directory, "info", ".txt")
+        
+        import os
+        print(f"\nLog file: {os.path.abspath(log_fs.getFileName())}")
+        
         with open(info_fs.getFileName(), "w+") as info_file:
             info_file.write(f"Log File: {log_fs.getFileName()}\n")
             info_file.write(f"Gif File: {gif_hex}\n")
