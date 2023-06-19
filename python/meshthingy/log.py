@@ -27,7 +27,7 @@ class Log:
         self.m_GPU = torch.cuda.is_available()
         self.m_CPU = not self.m_GPU
         self.m_GPU_Name = torch.cuda.get_device_name(0) if self.m_GPU else ""
-        self.m_Device_Name = os.environ.get('COMPUTERNAME', "") if self.m_CPU else ""
+        #self.m_Device_Name = os.environ.get('COMPUTERNAME', "") if self.m_CPU else ""
         self.m_GPU_Memory = torch.cuda.get_device_properties(0).total_memory if self.m_GPU else 0
 
         log_fs = IterativeFile(directory, "log", ".csv")
