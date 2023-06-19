@@ -52,7 +52,7 @@ class Log:
             info_file.write(f"GPU: {self.m_GPU}\n")
             info_file.write(f"CPU: {self.m_CPU}\n")
             info_file.write(f"GPU Name: {self.m_GPU_Name}\n")
-            info_file.write(f"Device Name: {self.m_Device_Name}\n")
+            #info_file.write(f"Device Name: {self.m_Device_Name}\n")
             info_file.write(f"GPU Memory: {self.m_GPU_Memory}\n")
 
     def log(self, AvgTimer, ColorTimer, iteration):
