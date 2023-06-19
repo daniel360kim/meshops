@@ -1,5 +1,7 @@
 from PIL import Image, ImageDraw
 import torch
+
+import os
   
 def draw_gif(images: list, save_path: str, fps: int = 20):
     
@@ -8,6 +10,9 @@ def draw_gif(images: list, save_path: str, fps: int = 20):
     # resize all images
     for i in range(len(images)):
         images[i] = images[i].resize((500, 500), Image.NEAREST)
+    
+    # absolute path
+    print(f"\nAbsolute path: {os.path.abspath(save_path)}")
     
     print(f"\nSaving gif to {save_path}")
 
