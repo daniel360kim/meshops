@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from PIL import Image
 import itertools
+from typing import Union
 
 from log import Log
 from log import IterativeFile
@@ -159,7 +160,7 @@ class NDSquareMesh:
 
     def run_timestep(
         self, 
-        kernel: torch.Tensor | np.ndarray | list = [[0, 1, 0], [1, 1, 1], [0, 1, 0]], 
+        kernel = [[0, 1, 0], [1, 1, 1], [0, 1, 0]], 
         conductivity_factor: float = ...
         ) -> None:
         
@@ -193,7 +194,7 @@ class NDSquareMesh:
         edge_indicies = _get_edge_indices(self.shape[0], self.shape[1], _ker_tensor.shape[0])
         
         for coords in edge_indicies:
-            new[*coords] = weighted_pool(
+            new[coords[0],coords[1]] = weighted_pool(
                 self.mesh,
                 coords[0],
                 coords[1],
