@@ -15,29 +15,29 @@ if torch.cuda.is_available():
 else:
     print("CUDA is not available, using CPU")
     device = torch.device("cpu")
-    
-def _index_out_of_bounds(arr, row: int, col: int) -> bool:
+
+def _index_out_of_bounds(arr, row, col):
     """
     Checks if a row and column are out of bounds of a 2D array.
     """
     return row < 0 or col < 0 or row >= len(arr) or col >= len(arr[row])
 
-def get_numbers_around_location(arr, row: int, col: int, radius: int = 1) -> list:
+def get_numbers_around_location(arr, row, col, radius=1):
     """
     Gets all numbers around a specified location in a 2D array as a list.
     If on edge, the list will contain less numbers.
     """
     nums = []
-    
+
     for mov_row in range(-radius, radius + 1):
         for mov_col in range(-radius, radius + 1):
             if mov_row == 0 and mov_col == 0:
                 continue
-            
+
             if _index_out_of_bounds(arr, row + mov_row, col + mov_col):
                 continue
-            
-            nums.append(arr[max(0,row + mov_row)][max(0,col + mov_col)])
+
+            nums.append(arr[max(0, row + mov_row)][max(0, col + mov_col)])
     return nums
 
 def _get_edge_indices(length, width, border_width):
@@ -51,51 +51,51 @@ def _get_edge_indices(length, width, border_width):
     return edge_indices
 
 class ConductiveBar:
-    def __init__(self, length: int = 50):
+    def __init__(self, length=50):
         self.mesh = torch.Tensor(length).fill_(0)
-    
-    def add_zone(self, start: int, end: int, temp: float = 0.5):
+
+    def add_zone(self, start, end, temp=0.5):
         for i in range(start, end):
-            self.mesh[i] = temp 
-            
+            self.mesh[i] = temp
+
     def get_iterable(self):
         return self.mesh
-    
+
 class ConductiveSurface:
     def __init__(self, shape: tuple[int], default_temp: float = 0):
         length, width = shape
         self.mesh = torch.Tensor(length, width).fill_(default_temp)
-    
-    def heat_square(self, loc: tuple = (0, 0), radius: int = 2, temperature: float = 0.5) -> None:
+
+    def heat_square(self, loc=(0, 0), radius=2, temperature=0.5):
         """
         Heats a "square" of mesh around `loc` to `temperature`.
         """
         padded = torch.nn.functional.pad(self.mesh, (radius, radius, radius, radius), mode='constant', value=0)
-        
+
         # change the square region around loc to temperature
         row_region_start = loc[0] - radius
         row_region_end = loc[0] + radius + 1
         col_region_start = loc[1] - radius
         col_region_end = loc[1] + radius + 1
-        
-        padded[row_region_start:row_region_end,col_region_start:col_region_end] = temperature
-        
+
+        padded[row_region_start:row_region_end, col_region_start:col_region_end] = temperature
+
         # unpad
         self.mesh = padded[radius:-radius, radius:-radius]
-            
-    def get_iterable(self) -> torch.Tensor:
+
+    def get_iterable(self):
         return self.mesh
-    
-    def _import_from_image(self, image_path: str) -> None:
+
+    def _import_from_image(self, image_path):
         """
         Imports a 2D image from `image_path` and sets the mesh to the grayscale values of the image.
         """
         img = Image.open(image_path)
         img = img.resize((self.mesh.shape[0], self.mesh.shape[1]))
-        
-        #convert all to grayscale
+
+        # convert all to grayscale
         arr = np.mean(np.array(img), axis=2) / 255
-        
+
         self.mesh = torch.Tensor(arr)
 
 # 3d framework
@@ -118,13 +118,13 @@ class NDSquareMesh:
             elif type(args[0]) == np.ndarray:
                 self.mesh = torch.Tensor(args[0])
         
-        elif len(args) == 2 and type(args[0] == tuple) and type(args[1] == int):
+        elif len(args) == 2 and type(args[0]) == tuple and type(args[1]) == int:
             # shape, default_temp
             shape, default_temp = args
             self.mesh = torch.full(shape, default_temp)
             
         else:
-            raise(TypeError("NDSquareMesh constructor accepts either `(tensor to convert): torch.Tensor` or `(shape): tuple[int], (default temp): int`"))
+            raise TypeError("NDSquareMesh constructor accepts either `(tensor to convert): torch.Tensor` or `(shape): tuple[int], (default temp): int`")
             
         self.shape = self.mesh.shape
         self.dimensions = len(self.shape)
@@ -143,17 +143,18 @@ class NDSquareMesh:
         _nd_slice_obj = []
         
         for i in range(self.dimensions):
-            _nd_slice_obj.append(slice(center[0] - radius, center[1] + radius + 1))
+            _nd_slice_obj.append(slice(center[0] - radius, center[0] + radius + 1))
 
-        self.mesh[*_nd_slice_obj] = temperature        
-         
+        self.mesh[tuple(_nd_slice_obj)] = temperature
+        
         # unpad
-        #print(f"before unpad: {self.mesh.shape}")
-        #_center_slice = [slice(radius,-radius)]*self.dimensions
-        #self.mesh = self.mesh[*_center_slice]
-        #print(f"not sliced slice dims: {self.mesh.shape}")
+        # print(f"before unpad: {self.mesh.shape}")
+        # _center_slice = [slice(radius,-radius)]*self.dimensions
+        # self.mesh = self.mesh[*_center_slice]
+        # print(f"not sliced slice dims: {self.mesh.shape}")
+
             
-    def get_iterable(self) -> torch.Tensor:
+    def get_iterable(self):
         return self.mesh
 
     def run_timestep(
@@ -240,7 +241,7 @@ class NDSquareMesh:
         #
         #self.mesh = avg
     
-    def _get_mask(conductivity_factor: float = 1):
+    def _get_mask(conductivity_factor=1):
         """
         Returns a mask for the given conductivity factor.
         """
@@ -252,7 +253,7 @@ class NDSquareMesh:
             ]
         ).to(device)
         
-    def _import_from_image(self, image_path: str) -> None:
+    def _import_from_image(self, image_path):
         
         if self.dimensions != 2:
             raise UnsupportedDimensionError("Importing from an image is only supported for 2D meshes.")
@@ -264,8 +265,7 @@ class NDSquareMesh:
 
         img = img.resize((self.mesh.shape[0], self.mesh.shape[1]))
         
-        #convert all to grayscale
+        # convert all to grayscale
         arr = np.mean(np.array(img), axis=2) / 255
-        
         
         self.mesh = torch.Tensor(arr)
