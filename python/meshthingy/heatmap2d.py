@@ -5,6 +5,7 @@ from log import IterativeFile
 from GIFmake import draw_gif
 from timing import Timer
 import numpy as np
+import os
 from PIL import Image
 from debug_progress_bar import _get_progress_string
 import matplotlib.colors as colors
