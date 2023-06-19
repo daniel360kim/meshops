@@ -124,19 +124,19 @@ class NDSquareMesh:
         
         # padded = torch.nn.functional.pad(self.mesh, self._pad_dims(1), mode='constant', value=0)
         
-        # change the square region around loc to temperature
+        # Change the square region around loc to temperature
         _nd_slice_obj = []
         
         for i in range(self.dimensions):
             _nd_slice_obj.append(slice(center[0] - radius, center[1] + radius + 1))
 
-        self.mesh[*_nd_slice_obj] = temperature        
-         
-        # unpad
-        #print(f"before unpad: {self.mesh.shape}")
-        #_center_slice = [slice(radius,-radius)]*self.dimensions
-        #self.mesh = self.mesh[*_center_slice]
-        #print(f"not sliced slice dims: {self.mesh.shape}")
+        self.mesh.__setitem__(tuple(_nd_slice_obj), temperature)
+        
+        # Unpad
+        # print(f"before unpad: {self.mesh.shape}")
+        # _center_slice = [slice(radius, -radius)] * self.dimensions
+        # self.mesh = self.mesh.__getitem__(tuple(_center_slice))
+        # print(f"not sliced slice dims: {self.mesh.shape}")
             
     def get_iterable(self) -> torch.Tensor:
         return self.mesh
