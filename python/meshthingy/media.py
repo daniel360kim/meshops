@@ -133,15 +133,16 @@ class NDSquareMesh:
         _nd_slice_obj = []
         
         for i in range(self.dimensions):
-            _nd_slice_obj.append(slice(center[0] - radius, center[1] + radius + 1))
+            _nd_slice_obj.append(slice(center[0] - radius, center[0] + radius + 1))
 
-        self.mesh[*_nd_slice_obj] = temperature
+        self.mesh[tuple(_nd_slice_obj)] = temperature
         
         # unpad
         # print(f"before unpad: {self.mesh.shape}")
         # _center_slice = [slice(radius,-radius)]*self.dimensions
         # self.mesh = self.mesh[*_center_slice]
         # print(f"not sliced slice dims: {self.mesh.shape}")
+
             
     def get_iterable(self):
         return self.mesh
