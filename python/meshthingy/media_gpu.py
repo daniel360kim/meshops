@@ -181,7 +181,7 @@ class NDSquareMeshCUDA:
         # Only run this function for the exterior of the mesh
         # For the interior, use the dot product
         
-        scaled = self.mesh.unsqueeze(0).unsqueeze(0).to(self.device)
+        scaled = self.mesh.float().unsqueeze(0).unsqueeze(0).to(self.device)
         #print(f"scaled: \n{scaled}")
         scaled_weights = (_ker_tensor).unsqueeze(0).unsqueeze(0).to(self.device)
         
