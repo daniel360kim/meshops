@@ -100,7 +100,7 @@ class ConductiveSurface:
         self.mesh = torch.Tensor(arr)
 
 # 3d framework
-class NDSquareMesh:
+class NDSquareMeshCUDA:
     def __init__(self, *args):
         """
         # NDSquareMesh

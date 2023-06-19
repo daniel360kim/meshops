@@ -1,5 +1,6 @@
 import torch
 from media import ConductiveSurface, NDSquareMesh
+from media_gpu import NDSquareMeshCUDA
 from log import Log
 from log import IterativeFile
 from GIFmake import draw_gif
@@ -52,7 +53,16 @@ def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
 
 time_counter = 0
 
-new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
+new_heatmap = ...
+if torch.cuda.is_available():
+    print("CUDA is available, using CUDA")
+    device = torch.device("cuda")
+    new_heatmap = NDSquareMeshCUDA((LENGTH, WIDTH), 0)
+else:
+    print("CUDA is not available, using CPU")
+    device = torch.device("cpu")
+    new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
+    
 new_heatmap.set_region((LENGTH//2, WIDTH//2), 15, 1)
 
 frames = []
