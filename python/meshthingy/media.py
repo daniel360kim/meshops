@@ -1,11 +1,13 @@
 import torch
 import numpy as np
 from PIL import Image
+import itertools
 
 from log import Log
 from log import IterativeFile
 from timing import Timer
 from errors import UnsupportedDimensionError
+from weighted_pool import weighted_pool
 
 if torch.cuda.is_available():
     print("CUDA is available, using GPU")
@@ -38,6 +40,16 @@ def get_numbers_around_location(arr, row: int, col: int, radius: int = 1) -> lis
             nums.append(arr[max(0,row + mov_row)][max(0,col + mov_col)])
     return nums
 
+def _get_edge_indices(length, width, border_width):
+    edge_indices = []
+    for i in range(length):
+        if i < border_width or i >= length - border_width:
+            edge_indices.extend([(i, j) for j in range(width)])
+        else:
+            for j in range(border_width):
+                edge_indices.extend([(i, j), (i, width - 1 - j)])
+    return edge_indices
+
 class ConductiveBar:
     def __init__(self, length: int = 50):
         self.mesh = torch.Tensor(length).fill_(0)
@@ -50,7 +62,8 @@ class ConductiveBar:
         return self.mesh
     
 class ConductiveSurface:
-    def __init__(self, length: int, width: int, default_temp: float = 0):
+    def __init__(self, shape: tuple[int], default_temp: float = 0):
+        length, width = shape
         self.mesh = torch.Tensor(length, width).fill_(default_temp)
     
     def heat_square(self, loc: tuple = (0, 0), radius: int = 2, temperature: float = 0.5) -> None:
@@ -91,35 +104,37 @@ class NDSquareMesh:
         """
         # NDSquareMesh
         
-        Represents an n-dimensional square mesh, tensor, or array.
+        Represents an n-dimensional square mesh. Each cell can interact with its neighbors through
+        user defined interactions.
         
         ## Overloads
         `NDSquareMesh(pytorch_tensor: torch.Tensor)`
         `NDSquareMesh(shape: tuple[int], default_temp: int)`
         """
         
-        if len(args) == 1 and type(args[0]) == torch.Tensor:
-            self.mesh = args[0]
+        if len(args) == 1:
+            if type(args[0]) == torch.Tensor:
+                self.mesh = args[0]
+            elif type(args[0]) == np.ndarray:
+                self.mesh = torch.Tensor(args[0])
         
         elif len(args) == 2 and type(args[0] == tuple) and type(args[1] == int):
             # shape, default_temp
             shape, default_temp = args
-            print(shape, default_temp)
             self.mesh = torch.full(shape, default_temp)
-            print(self.mesh.shape)
             
         else:
             raise(TypeError("NDSquareMesh constructor accepts either `(tensor to convert): torch.Tensor` or `(shape): tuple[int], (default temp): int`"))
             
         self.shape = self.mesh.shape
         self.dimensions = len(self.shape)
-        self.history = []
+        #self.history = []
             
         self._pad_dims = lambda mask_radius: tuple([mask_radius] * 2 * self.dimensions)
     
-    def heat_region(self, center: tuple, radius: int = 2, temperature: float = 0.5) -> None:
+    def set_region(self, center: tuple, radius: int = 2, temperature: float = 0.5) -> None:
         """
-        Heats a "N-dimensional cube" of mesh around `center` to `temperature`.
+        Sets a "N-dimensional cube" of mesh around `center` to `temperature`.
         """
         
         # padded = torch.nn.functional.pad(self.mesh, self._pad_dims(1), mode='constant', value=0)
@@ -141,49 +156,89 @@ class NDSquareMesh:
     def get_iterable(self) -> torch.Tensor:
         return self.mesh
 
-    def run_timestep(self, conductivity_factor: float = 1) -> None:
-        # save current state before moving on
-        #self.history.append(self.mesh.clone())
+    def run_timestep(
+        self, 
+        kernel: torch.Tensor | np.ndarray | list = [[0, 1, 0], [1, 1, 1], [0, 1, 0]], 
+        conductivity_factor: float = ...
+        ) -> None:
         
-        # Move tensors to GPU
+        if self.dimensions != 2:
+            raise NotImplementedError("Only 2D meshes are supported at the moment.")
+        
+        kernel_sum = sum([sum(row) for row in kernel])
+        #interior_ranges = [
+        #    slice(kernel.shape[i]//2, -kernel.shape[i]//2) for i in range(self.dimensions)
+        #]
+        _ker_tensor = torch.Tensor(kernel)
+        
+        # Only run this function for the exterior of the mesh
+        # For the interior, use the dot product
+        
+        scaled = (100 * self.mesh).long().unsqueeze(0).unsqueeze(0)
+        #print(f"scaled: \n{scaled}")
+        scaled_weights = (_ker_tensor).long().unsqueeze(0).unsqueeze(0)
+        
+        new = torch.nn.functional.conv2d(
+            scaled,
+            scaled_weights,
+        ) / (kernel_sum * 100)
+        
+        #new = new.float()/100
+        
+        new = torch.nn.functional.pad(new, (1, 1, 1, 1), mode='constant', value=0)
+        new = new[0, 0]
+        
+        # get indicies of edges
+        edge_indicies = _get_edge_indices(self.shape[0], self.shape[1], _ker_tensor.shape[0])
+        
+        for coords in edge_indicies:
+            new[*coords] = weighted_pool(
+                self.mesh,
+                coords[0],
+                coords[1],
+                _ker_tensor
+            )
+            
+        self.mesh = new #/ 100
+            
         
         # Create tensors for averaging with shifted versions of the heatmap tensor
-        shifts = []
-        for i in range(self.dimensions):
-            shifts.append(torch.roll(self.mesh, shifts=1, dims=i))
-            shifts.append(torch.roll(self.mesh, shifts=-1, dims=i))
-        
-        # Set certain edges to zero so numbers don't wrap around
-        # TODO - context-aware padding,
-        # XXX OR JUST HANDLE THE EDGES WITH A SEPARATE CASE IN THE AVERAGING FUNCTION
-        #shifted_left[:, -1] = 0
-        #shifted_right[:, 0] = 0
-        #shifted_up[-1, :] = 0
-        #shifted_down[0, :] = 0
-        
-        # Apply padding for the edge cases
-        # TODO - context-aware padding
-        padded_shifts = []
-        _pad_dims = self._pad_dims(self.dimensions)
-        padded_mesh = torch.nn.functional.pad(self.mesh, _pad_dims, mode='constant', value=0)
-        
-        for tens in shifts:
-            # probably have a custom pad function that handles edges better, or just handle the edges in the averaging function
-            padded_shifts.append(torch.nn.functional.pad(tens, _pad_dims, mode='constant', value=1))
-
-        # Calculate the average using tensors and avoid iteration
-        # Average the 3x3 square around each element
-        # TODO - add support for weighted averages
-        avg = (sum(padded_shifts)+padded_mesh) / (2 * self.dimensions + 1)
-        
-        # Remove padding
-        _remove_pad_slices = [slice(1,-1)]*self.dimensions
-        avg = avg[*_remove_pad_slices]
-        
-        # Move the result back to CPU if needed
-        avg = avg.cpu()
-        
-        self.mesh = avg
+        #shifts = []
+        #for i in range(self.dimensions):
+        #    shifts.append(torch.roll(self.mesh, shifts=1, dims=i))
+        #    shifts.append(torch.roll(self.mesh, shifts=-1, dims=i))
+        #
+        ## Set certain edges to zero so numbers don't wrap around
+        ## TODO - context-aware padding,
+        ## XXX OR JUST HANDLE THE EDGES WITH A SEPARATE CASE IN THE AVERAGING FUNCTION
+        ##shifted_left[:, -1] = 0
+        ##shifted_right[:, 0] = 0
+        ##shifted_up[-1, :] = 0
+        ##shifted_down[0, :] = 0
+        #
+        ## Apply padding for the edge cases
+        ## TODO - context-aware padding
+        #padded_shifts = []
+        #_pad_dims = self._pad_dims(1)
+        #padded_mesh = torch.nn.functional.pad(self.mesh, _pad_dims, mode='constant', value=0)
+        #
+        #for tens in shifts:
+        #    # probably have a custom pad function that handles edges better, or just handle the edges in the averaging function
+        #    padded_shifts.append(torch.nn.functional.pad(tens, _pad_dims, mode='constant', value=1))
+#
+        ## Calculate the average using tensors and avoid iteration
+        ## Average the 3x3 square around each element
+        ## TODO - add support for weighted averages
+        #avg = (sum(padded_shifts)+padded_mesh) / (2 * self.dimensions + 1)
+        #
+        ## Remove padding
+        #_remove_pad_slices = [slice(1,-1)]*self.dimensions
+        #avg = avg[*_remove_pad_slices]
+        #
+        ## Move the result back to CPU if needed
+        #avg = avg.cpu()
+        #
+        #self.mesh = avg
     
     def _get_mask(conductivity_factor: float = 1):
         """

@@ -15,14 +15,6 @@ class MetalBar:
     def get_iterable(self):
         return self.atoms
 
-# convert to 1d tensor
-heatmap_random = MetalBar(10000)
-
-# add zones
-heatmap_random.add_zone(30, 40, 1)
-
-heatmap_random = heatmap_random.get_iterable()
-
 def get_color_escape(r, g, b, background=False):
     return '\033[{};2;{};{};{}m'.format(48 if background else 38, r, g, b)
 
@@ -61,14 +53,3 @@ def val_to_rgb(val: float) -> tuple[int]:
     
     _unscaled = colorsys.hsv_to_rgb(scaled_val, 1, 1)
     return tuple([int(val * 255) for val in _unscaled])
-
-
-time_counter = 0
-#print()
-#print_str_representation(heatmap_random, time_counter)
-#with open("export_data.csv", "w") as f:
-while True:
-    time_counter += 1
-    heatmap_random = runtimestep(heatmap_random, time_counter)
-    print(f"Iteration: {time_counter}", end="\r")
-

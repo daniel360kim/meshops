@@ -1,0 +1,8 @@
+Log file for csv file: export_data_{ARRAY_SIZE}_{file_iterator}.csv
+tests/export_data_90_5.csvTest run at 2023-06-18 19:26:30.329329
+Hardware:
+    GPU: None
+    Array size: 90
+.
+.
+.

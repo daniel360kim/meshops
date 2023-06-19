@@ -3,7 +3,7 @@ import stringcolor
 from time import sleep
 import colorsys
 import math
-from media import ConductiveBar
+from iterate import MetalBar
 from datetime import datetime
 import os
 
@@ -12,7 +12,7 @@ if torch.cuda.is_available():
 else:
     print("CUDA is not available, using CPU")
 
-ARRAY_SIZE = 100
+ARRAY_SIZE = 90
 
 ## Create new csv file 
 file_iterator = 0
@@ -21,25 +21,25 @@ while(os.path.exists(f"tests/export_data_{ARRAY_SIZE}_{file_iterator}.csv")):
 csv_file = open(f"tests/export_data_{ARRAY_SIZE}_{file_iterator}.csv", "w")
 
 ## Log file
-log_file = open("tests/log.txt", "w")
-log_file.write("Log file for csv file: ")
-log_file.write("export_data_{ARRAY_SIZE}_{file_iterator}.csv\n")
-log_file.write(csv_file.name)
-log_file.write(f"Test run at {datetime.now()}\n")
-log_file.write("Hardware:\n")
-if torch.cuda.is_available():
-    log_file.write(f"    GPU: {torch.cuda.get_device_name(0)}\n")
-else:
-    log_file.write("    GPU: None\n")
-log_file.write(f"    Array size: {ARRAY_SIZE}\n")
+with open("tests/log.txt", "w") as log_file:
+    log_file.write("Log file for csv file: ")
+    log_file.write("export_data_{ARRAY_SIZE}_{file_iterator}.csv\n")
+    log_file.write(csv_file.name)
+    log_file.write(f"Test run at {datetime.now()}\n")
+    log_file.write("Hardware:\n")
+    if torch.cuda.is_available():
+        log_file.write(f"    GPU: {torch.cuda.get_device_name(0)}\n")
+    else:
+        log_file.write("    GPU: None\n")
+    log_file.write(f"    Array size: {ARRAY_SIZE}\n")
 
-for i in range(3):
-    log_file.write(".\n")
+    for i in range(3):
+        log_file.write(".\n")
 
 
 # convert to 1d tensor
-heatmap_random = ConductiveBar(ARRAY_SIZE)
-heatmap_random.add_zone(20, 30, 1)
+heatmap_random = MetalBar(ARRAY_SIZE)
+heatmap_random.add_zone(20, 40, 1)
 
 heatmap_random = heatmap_random.get_iterable()
 
