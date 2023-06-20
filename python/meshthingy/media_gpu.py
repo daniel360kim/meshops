@@ -32,15 +32,18 @@ def get_numbers_around_location(arr: torch.Tensor, row, col, radius=1):
     
     nums = []
 
-    for mov_row in range(-radius, radius + 1):
-        for mov_col in range(-radius, radius + 1):
-            if mov_row == 0 and mov_col == 0:
-                continue
+    nums = nums.to(device)
 
-            if _index_out_of_bounds(arr, row + mov_row, col + mov_col):
-                continue
+    with torch.cuda.device(device):
+        for mov_row in range(-radius, radius + 1):
+            for mov_col in range(-radius, radius + 1):
+                if mov_row == 0 and mov_col == 0:
+                    continue
 
-            nums.append(arr[max(0, row + mov_row)][max(0, col + mov_col)])
+                if _index_out_of_bounds(arr, row + mov_row, col + mov_col):
+                    continue
+
+                nums.append(arr[max(0, row + mov_row)][max(0, col + mov_col)])
     return nums
 
 def _get_edge_indices(length, width, border_width):
@@ -175,53 +178,59 @@ class NDSquareMeshCUDA:
         if self.dimensions != 2:
             raise NotImplementedError("Only 2D meshes are supported at the moment.")
         
-        kernel_sum = sum([sum(row) for row in kernel])
-        #interior_ranges = [
-        #    slice(kernel.shape[i]//2, -kernel.shape[i]//2) for i in range(self.dimensions)
-        #]
-        _ker_tensor = torch.Tensor(kernel)
-        
-        # Only run this function for the exterior of the mesh
-        # For the interior, use the dot product
-        
-        scaled = self.mesh.float().unsqueeze(0).unsqueeze(0).to(self.device)
-        #print(f"scaled: \n{scaled}")
-        scaled_weights = (_ker_tensor).unsqueeze(0).unsqueeze(0).to(self.device)
-        
-        new = torch.nn.functional.conv2d(
-            scaled,
-            scaled_weights,
-        ) / kernel_sum
-        
-        #new = new.float()/100
-        
-        new = torch.nn.functional.pad(new, (1, 1, 1, 1), mode='constant', value=0)
-        new = new[0, 0]
-        
-        # get indicies of edges
-        edge_indicies = _get_edge_indices(self.shape[0], self.shape[1], _ker_tensor.shape[0])
-        
-        for coords in edge_indicies:
-            new[coords[0],coords[1]] = weighted_pool(
-                self.mesh,
-                coords[0],
-                coords[1],
-                _ker_tensor
-            )
+        with torch.cuda.device(self.device):
+            kernel_sum = sum([sum(row) for row in kernel])
+            #interior_ranges = [
+            #    slice(kernel.shape[i]//2, -kernel.shape[i]//2) for i in range(self.dimensions)
+            #]
+            _ker_tensor = torch.Tensor(kernel)
+
+            _ker_tensor = _ker_tensor.to(self.device)
             
-        self.mesh = new.to(self.device) #/ 100
-    
+            # Only run this function for the exterior of the mesh
+            # For the interior, use the dot product
+            
+            scaled = self.mesh.float().unsqueeze(0).unsqueeze(0).to(self.device)
+            #print(f"scaled: \n{scaled}")
+            scaled_weights = (_ker_tensor).unsqueeze(0).unsqueeze(0).to(self.device)
+            
+            new = torch.nn.functional.conv2d(
+                scaled,
+                scaled_weights,
+            ) / kernel_sum
+            
+            #new = new.float()/100
+            
+            new = torch.nn.functional.pad(new, (1, 1, 1, 1), mode='constant', value=0)
+            new = new[0, 0]
+            
+            # get indicies of edges
+            edge_indicies = _get_edge_indices(self.shape[0], self.shape[1], _ker_tensor.shape[0])
+            
+            for coords in edge_indicies:
+                new[coords[0],coords[1]] = weighted_pool(
+                    self.mesh,
+                    coords[0],
+                    coords[1],
+                    _ker_tensor
+                )
+                
+            self.mesh = new.to(self.device) #/ 100
+        
     def _get_mask(self, conductivity_factor=1):
         """
         Returns a mask for the given conductivity factor.
         """
-        return torch.Tensor(
-            [
-                [conductivity_factor/3, conductivity_factor, conductivity_factor/3],
-                [conductivity_factor  , 1                  , conductivity_factor],
-                [conductivity_factor/3, conductivity_factor, conductivity_factor/3]
-            ]
-        ).to(self.device)
+        mask = torch.Tensor().to(self.device)
+        with torch.cuda.device(self.device):
+            mask = torch.Tensor(
+                [
+                    [conductivity_factor/3, conductivity_factor, conductivity_factor/3],
+                    [conductivity_factor  , 1                  , conductivity_factor],
+                    [conductivity_factor/3, conductivity_factor, conductivity_factor/3]
+                ]
+            ).to(self.device)
+        return mask
         
     def _import_from_image(self, image_path):
         

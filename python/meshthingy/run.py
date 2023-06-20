@@ -33,12 +33,13 @@ def run(size: tuple = (50, 50), iterations: int = 100, fps: int = 10) -> None:
 
     def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
         arr = arr.to(device)
-        scaled_vals = -0.693 * arr + 0.693
-        hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
-        hsv_array = hsv_tensor.cpu().numpy()
+        with torch.cuda.device(device):
+            scaled_vals = -0.693 * arr + 0.693
+            hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
+            hsv_array = hsv_tensor.cpu().numpy()
 
-        rgb_array = colors.hsv_to_rgb(hsv_array) * 255
-        frame = np.round(rgb_array).astype(np.uint8)
+            rgb_array = colors.hsv_to_rgb(hsv_array) * 255
+            frame = np.round(rgb_array).astype(np.uint8)
 
         return frame
 
