@@ -12,8 +12,6 @@ from debug_progress_bar import _get_progress_string
 import matplotlib.colors as colors
 from weighted_pool import weighted_pool
 
-#torch.set_num_threads(6)
-
 if torch.cuda.is_available():
     print("CUDA is available, using CUDA")
     device = torch.device("cuda")
@@ -42,30 +40,25 @@ PERF_average_calc_timer = Timer()
 PERF_color_calc_timer = Timer()
 
 def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
-    if torch.cuda.is_available():
-        device = torch.device("cuda")
-    else:
-        device = torch.device("cpu")
-
     arr = arr.to(device)
 
-    scaled_vals = -0.693 * arr + 0.693
-    hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
-    hsv_array = hsv_tensor.cpu().numpy()
+    with torch.cuda.device(device):
+        scaled_vals = -0.693 * arr + 0.693
+        hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
+        hsv_array = hsv_tensor.cpu().numpy()
 
-    rgb_array = colors.hsv_to_rgb(hsv_array) * 255
-    frame = np.round(rgb_array).astype(np.uint8)
+        rgb_array = colors.hsv_to_rgb(hsv_array) * 255
+        frame = np.round(rgb_array).astype(np.uint8)
 
     return frame
 
 time_counter = 0
 
 new_heatmap = ...
+
 if torch.cuda.is_available():
-    device = torch.device("cuda")
     new_heatmap = NDSquareMeshCUDA((LENGTH, WIDTH), 0)
 else:
-    device = torch.device("cpu")
     new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
     
 new_heatmap.set_region((LENGTH//2, WIDTH//2), 15, 1)

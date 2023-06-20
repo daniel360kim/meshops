@@ -10,13 +10,6 @@ from timing import Timer
 from errors import UnsupportedDimensionError
 from weighted_pool import weighted_pool
 
-if torch.cuda.is_available():
-    print("CUDA is available, using GPU")
-    device = torch.device("cuda")
-else:
-    print("CUDA is not available, using CPU")
-    device = torch.device("cpu")
-
 def _index_out_of_bounds(arr, row, col):
     """
     Checks if a row and column are out of bounds of a 2D array.
@@ -30,10 +23,9 @@ def get_numbers_around_location(arr, row, col, radius=1):
     """
     if torch.cuda.is_available():
         device = torch.device("cuda")
+        arr = arr.to(device)
     else:
         device = torch.device("cpu")
-
-    arr = arr.to(device)
 
     nums = []
 
@@ -79,9 +71,15 @@ class ConductiveSurface:
         """
         Heats a "square" of mesh around `loc` to `temperature`.
         """
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        else:
+            device = torch.device("cpu")
+
         padded = torch.nn.functional.pad(self.mesh, (radius, radius, radius, radius), mode='constant', value=0)
 
         padded = padded.to(device)
+        self.mesh = self.mesh.to(device)
 
         with torch.cuda.device(device):
             # change the square region around loc to temperature
@@ -225,6 +223,10 @@ class NDSquareMesh:
         """
         Returns a mask for the given conductivity factor.
         """
+        if torch.cuda.is_available():
+            device = torch.device('cuda')
+        else:
+            device = torch.device('cpu')
 
         with torch.cuda.device(device):
             mask = torch.tensor(

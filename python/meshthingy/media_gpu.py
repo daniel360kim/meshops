@@ -10,12 +10,7 @@ from timing import Timer
 from errors import UnsupportedDimensionError
 from weighted_pool import weighted_pool
 
-if torch.cuda.is_available():
-    print("CUDA is available, using GPU")
-    device = torch.device("cuda")
-else:
-    print("CUDA is not available, using CPU")
-    device = torch.device("cpu")
+
 
 def _index_out_of_bounds(shape: tuple, indicies: tuple) -> bool:
     """
@@ -28,6 +23,12 @@ def get_numbers_around_location(arr: torch.Tensor, row, col, radius=1):
     Gets all numbers around a specified location in a 2D array as a list.
     If on edge, the list will contain less numbers.
     """
+
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else: 
+        device = torch.device("cpu")
+        
     arr = arr.to(device)
     
     nums = []
