@@ -9,13 +9,21 @@ def _index_out_of_bounds(arr: Union[Iterable, SupportsIndex], row: int, col: int
 
 
 def weighted_pool(arr: Union[torch.Tensor, SupportsIndex], row: int, col: int, kernel: torch.Tensor) -> list:   
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    kernel = kernel.to(device)
+    arr = arr.to(device)
+    
     weighted_sum = 0.0
     kernel_weights_used = 0.0
     
     _kernel_lrow = kernel.shape[0] // 2 # radius along rows (horizontal), also the center row of the kernel
     _kernel_lcol = kernel.shape[1] // 2 # radius along cols (vertical), also the center col of the kernel
     
-    arr_interior = arr[_kernel_lrow:-_kernel_lrow, _kernel_lcol:-_kernel_lcol]
+    #arr_interior = arr[_kernel_lrow:-_kernel_lrow, _kernel_lcol:-_kernel_lcol]
     
     # optimize to only weighted pool the edges, not going through all the interior
     for mov_row in range(-_kernel_lrow, _kernel_lrow + 1):

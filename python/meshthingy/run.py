@@ -11,8 +11,6 @@ from debug_progress_bar import _get_progress_string
 import matplotlib.colors as colors
 
 def run(size: tuple = (50, 50), iterations: int = 100, fps: int = 10) -> None:
-
-
     if torch.cuda.is_available():
         device = torch.device("cuda")
     else:
@@ -34,6 +32,7 @@ def run(size: tuple = (50, 50), iterations: int = 100, fps: int = 10) -> None:
     PERF_color_calc_timer = Timer()
 
     def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
+        arr = arr.to(device)
         scaled_vals = -0.693 * arr + 0.693
         hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
         hsv_array = hsv_tensor.cpu().numpy()
@@ -47,11 +46,11 @@ def run(size: tuple = (50, 50), iterations: int = 100, fps: int = 10) -> None:
 
     new_heatmap = ...
     if torch.cuda.is_available():
-        #print("CUDA is available, using CUDA")
+        print("[TOP LEVEL] CUDA is available, using CUDA")
         device = torch.device("cuda")
         new_heatmap = NDSquareMeshCUDA((LENGTH, WIDTH), 0)
     else:
-        #print("CUDA is not available, using CPU")
+        print("CUDA is not available, using CPU")
         device = torch.device("cpu")
         new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
         

@@ -17,17 +17,19 @@ else:
     print("CUDA is not available, using CPU")
     device = torch.device("cpu")
 
-def _index_out_of_bounds(arr, row, col):
+def _index_out_of_bounds(shape: tuple, indicies: tuple) -> bool:
     """
-    Checks if a row and column are out of bounds of a 2D array.
+    Checks if a row and column are out of bounds of a given shape.
     """
-    return row < 0 or col < 0 or row >= len(arr) or col >= len(arr[row])
+    return (indicies[i] < 0 or indicies[i] >= shape[i] for i in range(len(shape)))
 
-def get_numbers_around_location(arr, row, col, radius=1):
+def get_numbers_around_location(arr: torch.Tensor, row, col, radius=1):
     """
     Gets all numbers around a specified location in a 2D array as a list.
     If on edge, the list will contain less numbers.
     """
+    arr = arr.to(device)
+    
     nums = []
 
     for mov_row in range(-radius, radius + 1):
@@ -113,10 +115,7 @@ class NDSquareMeshCUDA:
         `NDSquareMesh(shape: tuple[int], default_temp: int)`
         """
         
-        if torch.cuda.is_available():
-            self.device = torch.device('cuda')
-        else:
-            self.device = torch.device('cpu')
+        self.device = torch.device('cuda')
         
         if len(args) == 1:
             if type(args[0]) == torch.Tensor:
@@ -168,6 +167,10 @@ class NDSquareMeshCUDA:
         kernel = [[0, 1, 0], [1, 1, 1], [0, 1, 0]], 
         conductivity_factor: float = ...
         ) -> None:
+        
+        try:
+            kernel = kernel.to(self.device)
+        except: pass
         
         if self.dimensions != 2:
             raise NotImplementedError("Only 2D meshes are supported at the moment.")

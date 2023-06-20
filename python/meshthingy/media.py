@@ -28,6 +28,13 @@ def get_numbers_around_location(arr, row, col, radius=1):
     Gets all numbers around a specified location in a 2D array as a list.
     If on edge, the list will contain less numbers.
     """
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    arr = arr.to(device)
+
     nums = []
 
     for mov_row in range(-radius, radius + 1):

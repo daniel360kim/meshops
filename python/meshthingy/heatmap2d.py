@@ -42,6 +42,13 @@ PERF_average_calc_timer = Timer()
 PERF_color_calc_timer = Timer()
 
 def get_rgb_ndarr(arr: torch.Tensor) -> np.ndarray:
+    if torch.cuda.is_available():
+        device = torch.device("cuda")
+    else:
+        device = torch.device("cpu")
+
+    arr = arr.to(device)
+
     scaled_vals = -0.693 * arr + 0.693
     hsv_tensor = torch.stack([scaled_vals, torch.ones_like(arr), torch.ones_like(arr)], dim=-1)
     hsv_array = hsv_tensor.cpu().numpy()
@@ -55,11 +62,9 @@ time_counter = 0
 
 new_heatmap = ...
 if torch.cuda.is_available():
-    print("CUDA is available, using CUDA")
     device = torch.device("cuda")
     new_heatmap = NDSquareMeshCUDA((LENGTH, WIDTH), 0)
 else:
-    print("CUDA is not available, using CPU")
     device = torch.device("cpu")
     new_heatmap = NDSquareMesh((LENGTH, WIDTH), 0)
     
