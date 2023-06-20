@@ -106,7 +106,7 @@ for i in range(1000):
 
     
     #write time to csv
-    csv_file.write(f"{t2-t1}\n")
+
     
 
     #print(f"\nIteration: {time_counter}; Shape={heatmap_random.shape}", end="\r")

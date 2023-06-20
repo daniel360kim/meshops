@@ -57,8 +57,6 @@ def runtimestep(heatmap: torch.Tensor, time_counter):
     
     return _aux_tensor
 
-
-
 def get_color_escape(r, g, b, background=False):
     return '\033[{};2;{};{};{}m'.format(48 if background else 38, r, g, b)
 
