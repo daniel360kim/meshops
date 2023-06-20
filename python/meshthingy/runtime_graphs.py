@@ -1,6 +1,6 @@
 from run import run
 
-_filename = "runtime_data_1.csv"
+_filename = "runtime_data_2.csv"
 
 with open(f"{_filename}", "w") as f:
     f.write("side_len,a_avg, b_avg, w_avg, a_clr, b_clr, w_clr\n")

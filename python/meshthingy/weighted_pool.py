@@ -1,14 +1,14 @@
 import torch
-from typing import Iterable, SupportsIndex
+from typing import Iterable, SupportsIndex, Union
 
-def _index_out_of_bounds(arr: Iterable | SupportsIndex, row: int, col: int) -> bool:
+def _index_out_of_bounds(arr: Union[Iterable, SupportsIndex], row: int, col: int) -> bool:
     """
     Checks if a row and column are out of bounds of a 2D array.
     """
     return row < 0 or col < 0 or row >= len(arr) or col >= len(arr[row])
 
 
-def weighted_pool(arr: torch.Tensor | SupportsIndex, row: int, col: int, kernel: torch.Tensor) -> list:   
+def weighted_pool(arr: Union[torch.Tensor, SupportsIndex], row: int, col: int, kernel: torch.Tensor) -> list:   
     weighted_sum = 0.0
     kernel_weights_used = 0.0
     
